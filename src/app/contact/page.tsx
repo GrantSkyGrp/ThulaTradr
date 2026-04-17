@@ -9,7 +9,7 @@ type ContactPageProps = {
 
 export default async function ContactPage({ searchParams }: ContactPageProps) {
   const brand = getActiveBrand();
-  const content = await getPageContent("contact");
+  const content = await getPageContent("contact").catch(() => null);
   const params = searchParams ? await searchParams : undefined;
 
   return (

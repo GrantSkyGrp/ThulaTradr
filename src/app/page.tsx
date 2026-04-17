@@ -5,7 +5,7 @@ import { getPageContent } from "@/lib/local-db";
 
 export default async function HomePage() {
   const brand = getActiveBrand();
-  const content = await getPageContent("home");
+  const content = await getPageContent("home").catch(() => null);
 
   const pageBrand = content
     ? {
