@@ -18,10 +18,14 @@ type TransactionRow = {
   billingEmail: string | null;
   paymentProofStatus: string;
   paymentProofName: string | null;
+  paymentProofContentType: string | null;
+  paymentProofData: Uint8Array | null;
   sellerPayoutStatus: string | null;
   sellerPayoutReference: string | null;
   agreementStatus: string | null;
   agreementName: string | null;
+  agreementContentType: string | null;
+  agreementData: Uint8Array | null;
   ownershipTransferredAt: Date | null;
   createdAt: Date;
 };
@@ -95,10 +99,14 @@ export type LocalTransactionRecord = {
   billingEmail: string;
   paymentProofStatus: "pending" | "uploaded" | "received";
   paymentProofName: string;
+  paymentProofContentType: string;
+  paymentProofData: Uint8Array | null;
   sellerPayoutStatus: "pending" | "received";
   sellerPayoutReference: string;
   agreementStatus: "pending" | "received";
   agreementName: string;
+  agreementContentType: string;
+  agreementData: Uint8Array | null;
   ownershipTransferredAt: string | null;
   createdAt: string;
 };
@@ -369,10 +377,14 @@ function mapTransaction(transaction: TransactionRow): LocalTransactionRecord {
     billingEmail: transaction.billingEmail ?? "",
     paymentProofStatus: transaction.paymentProofStatus as LocalTransactionRecord["paymentProofStatus"],
     paymentProofName: transaction.paymentProofName ?? "",
+    paymentProofContentType: transaction.paymentProofContentType ?? "",
+    paymentProofData: transaction.paymentProofData ?? null,
     sellerPayoutStatus: (transaction.sellerPayoutStatus ?? "pending") as LocalTransactionRecord["sellerPayoutStatus"],
     sellerPayoutReference: transaction.sellerPayoutReference ?? "",
     agreementStatus: (transaction.agreementStatus ?? "pending") as LocalTransactionRecord["agreementStatus"],
     agreementName: transaction.agreementName ?? "",
+    agreementContentType: transaction.agreementContentType ?? "",
+    agreementData: transaction.agreementData ?? null,
     ownershipTransferredAt: transaction.ownershipTransferredAt?.toISOString() ?? null,
     createdAt: transaction.createdAt.toISOString(),
   };
@@ -555,6 +567,12 @@ async function updateTransactionDocumentStatusByName(
   });
 }
 
+function toPrismaBytes(data: Uint8Array): Uint8Array<ArrayBuffer> {
+  const bytes = new Uint8Array(data.byteLength);
+  bytes.set(data);
+  return bytes;
+}
+
 async function getTransactionsWhere(
   whereSql: string,
   values: unknown[] = [],
@@ -579,10 +597,14 @@ async function getTransactionsWhere(
         "billingEmail" as "billingEmail",
         "paymentProofStatus" as "paymentProofStatus",
         "paymentProofName" as "paymentProofName",
+        "paymentProofContentType" as "paymentProofContentType",
+        "paymentProofData" as "paymentProofData",
         "sellerPayoutStatus" as "sellerPayoutStatus",
         "sellerPayoutReference" as "sellerPayoutReference",
         "agreementStatus" as "agreementStatus",
         "agreementName" as "agreementName",
+        "agreementContentType" as "agreementContentType",
+        "agreementData" as "agreementData",
         "ownershipTransferredAt" as "ownershipTransferredAt",
         "createdAt" as "createdAt"
       FROM "Transaction"
@@ -814,12 +836,16 @@ export async function ensureTransactionForAcceptedOffer(
       id, "offerId", "listingSlug", "listingModel", "userId", "userName", "userEmail",
       status, "invoiceDetailsStatus", "billingFullName", "billingCompanyName", "billingVatNumber",
       "billingAddress", "billingCellNumber", "billingEmail", "paymentProofStatus", "paymentProofName",
-      "sellerPayoutStatus", "sellerPayoutReference", "agreementStatus", "agreementName", "ownershipTransferredAt"
+      "paymentProofContentType", "paymentProofData",
+      "sellerPayoutStatus", "sellerPayoutReference", "agreementStatus", "agreementName",
+      "agreementContentType", "agreementData", "ownershipTransferredAt"
     ) VALUES (
       ${transactionId}, ${offer.id}, ${offer.listingSlug}, ${offer.listingModel}, ${offer.userId}, ${offer.userName}, ${offer.userEmail},
       ${"awaiting_invoice_details"}, ${"pending"}, ${""}, ${""}, ${""},
       ${""}, ${""}, ${""}, ${"pending"}, ${""},
-      ${"pending"}, ${""}, ${"pending"}, ${""}, ${null}
+      ${""}, ${null},
+      ${"pending"}, ${""}, ${"pending"}, ${""},
+      ${""}, ${null}, ${null}
     )
   `;
 
@@ -986,13 +1012,20 @@ async function getNextInvoiceNumber() {
   return `TT-INV-${String(highestInvoiceNumber + 1).padStart(5, "0")}`;
 }
 
-export async function submitPaymentProof(transactionId: string, proofName: string) {
+export async function submitPaymentProof(
+  transactionId: string,
+  proofName: string,
+  contentType: string,
+  data: Buffer,
+) {
   const transaction = await db.transaction.update({
     where: { id: transactionId },
     data: {
       status: "payment_submitted",
       paymentProofStatus: "uploaded",
       paymentProofName: proofName,
+      paymentProofContentType: contentType,
+      paymentProofData: toPrismaBytes(data),
     },
   });
 
@@ -1073,6 +1106,8 @@ export async function declineTransactionPaymentProof(
       status: "invoice_issued",
       paymentProofStatus: "pending",
       paymentProofName: "",
+      paymentProofContentType: "",
+      paymentProofData: null,
     },
   });
 
@@ -1096,16 +1131,20 @@ export async function declineTransactionPaymentProof(
 export async function issueBuyerAgreement(
   transactionId: string,
   agreementName: string,
+  contentType: string,
+  data: Buffer,
   actorRole: LocalActivityRecord["actorRole"] = "admin",
 ) {
-  await db.$executeRaw`
-    UPDATE "Transaction"
-    SET
-      status = ${"agreement_sent"},
-      "agreementStatus" = ${"received"},
-      "agreementName" = ${agreementName}
-    WHERE id = ${transactionId}
-  `;
+  await db.transaction.update({
+    where: { id: transactionId },
+    data: {
+      status: "agreement_sent",
+      agreementStatus: "received",
+      agreementName,
+      agreementContentType: contentType,
+      agreementData: toPrismaBytes(data),
+    },
+  });
 
   const transaction = await getTransactionById(transactionId);
   if (!transaction) {
@@ -1280,11 +1319,10 @@ export async function updateListingUpdateRequestStatus(
 export async function getTransactionsBySellerId(
   sellerId: string,
 ): Promise<LocalTransactionRecord[]> {
-  const transactions = await db.transaction.findMany({
-    where: { listing: { sellerId } },
-    orderBy: { createdAt: "desc" },
-  });
-  return transactions.map(mapTransaction);
+  return getTransactionsWhere(
+    `WHERE "listingSlug" IN (SELECT slug FROM "Listing" WHERE "sellerId" = $1) ORDER BY "createdAt" DESC`,
+    [sellerId],
+  );
 }
 
 export async function getOffersBySellerId(sellerId: string): Promise<LocalOfferRecord[]> {

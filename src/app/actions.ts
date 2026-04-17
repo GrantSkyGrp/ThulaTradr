@@ -4,9 +4,9 @@ import { revalidatePath } from "next/cache";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { requireAdmin, requireAdminOrOperator, requireUser, sessionCookieName } from "@/lib/auth";
-import { saveBuyerAgreementFile } from "@/lib/agreement-storage";
+import { getAgreementContentType } from "@/lib/agreement-storage";
 import { formatCurrency, parseCurrency } from "@/lib/marketplace/format";
-import { savePaymentProofFile } from "@/lib/payment-proof-storage";
+import { getPaymentProofContentType } from "@/lib/payment-proof-storage";
 import {
   findUserByEmail,
   createOffer,
@@ -436,13 +436,18 @@ export async function uploadPaymentProofAction(formData: FormData) {
   const proofFile = formData.get("paymentProof");
   const uploadedProofName =
     proofFile instanceof File && proofFile.name && proofFile.size > 0
-      ? await savePaymentProofFile(transactionId, proofFile)
+      ? proofFile.name.trim()
       : "";
   const proofReference = String(formData.get("proofName") ?? "").trim();
   const proofName = uploadedProofName || proofReference;
 
-  if (transactionId && proofName) {
-    await submitPaymentProof(transactionId, proofName);
+  if (transactionId && proofName && proofFile instanceof File && proofFile.size > 0) {
+    await submitPaymentProof(
+      transactionId,
+      proofName,
+      proofFile.type || getPaymentProofContentType(proofName),
+      Buffer.from(await proofFile.arrayBuffer()),
+    );
   }
 
   revalidatePath("/account/transactions");
@@ -486,11 +491,17 @@ export async function issueBuyerAgreementAction(formData: FormData) {
   const agreementFile = formData.get("agreementFile");
   const uploadedAgreementName =
     agreementFile instanceof File && agreementFile.name && agreementFile.size > 0
-      ? await saveBuyerAgreementFile(transactionId, agreementFile)
+      ? agreementFile.name.trim()
       : "";
 
-  if (transactionId && uploadedAgreementName) {
-    await issueBuyerAgreement(transactionId, uploadedAgreementName, user.role);
+  if (transactionId && uploadedAgreementName && agreementFile instanceof File && agreementFile.size > 0) {
+    await issueBuyerAgreement(
+      transactionId,
+      uploadedAgreementName,
+      agreementFile.type || getAgreementContentType(uploadedAgreementName),
+      Buffer.from(await agreementFile.arrayBuffer()),
+      user.role,
+    );
   }
 
   revalidatePath("/admin/transactions");
