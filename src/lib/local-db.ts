@@ -555,7 +555,10 @@ async function updateTransactionDocumentStatusByName(
   });
 }
 
-async function getTransactionsWhere(whereSql: string, values: unknown[] = []) {
+async function getTransactionsWhere(
+  whereSql: string,
+  values: unknown[] = [],
+): Promise<LocalTransactionRecord[]> {
   const rows = await db.$queryRawUnsafe<TransactionRow[]>(
     `
       SELECT
@@ -591,19 +594,19 @@ async function getTransactionsWhere(whereSql: string, values: unknown[] = []) {
   return rows.map(mapTransaction);
 }
 
-export async function findUserByEmail(email: string) {
+export async function findUserByEmail(email: string): Promise<LocalUserRecord | null> {
   const user = await db.user.findUnique({ where: { email } });
   return user ? mapUser(user) : null;
 }
 
-export async function findUserById(id: string) {
+export async function findUserById(id: string): Promise<LocalUserRecord | null> {
   const user = await db.user.findUnique({ where: { id } });
   return user ? mapUser(user) : null;
 }
 
 export async function createOffer(
   input: Omit<LocalOfferRecord, "id" | "status" | "buyerTermsAccepted" | "createdAt">,
-) {
+): Promise<LocalOfferRecord> {
   const listing = await db.listing.findUnique({ where: { slug: input.listingSlug } });
   const offer = await db.offer.create({
     data: {
@@ -651,7 +654,7 @@ export async function createOffer(
   return mapOffer(offer);
 }
 
-export async function getOffersByUserId(userId: string) {
+export async function getOffersByUserId(userId: string): Promise<LocalOfferRecord[]> {
   const offers = await db.offer.findMany({
     where: { userId },
     orderBy: { createdAt: "desc" },
@@ -659,7 +662,7 @@ export async function getOffersByUserId(userId: string) {
   return offers.map(mapOffer);
 }
 
-export async function getAllOffers() {
+export async function getAllOffers(): Promise<LocalOfferRecord[]> {
   const offers = await db.offer.findMany({ orderBy: { createdAt: "desc" } });
   return offers.map(mapOffer);
 }
@@ -770,12 +773,12 @@ export async function updateOfferBuyerTermsAccepted(id: string, accepted: boolea
   });
 }
 
-export async function getOfferById(id: string) {
+export async function getOfferById(id: string): Promise<LocalOfferRecord | null> {
   const offer = await db.offer.findUnique({ where: { id } });
   return offer ? mapOffer(offer) : null;
 }
 
-export async function getAllListings() {
+export async function getAllListings(): Promise<LocalListingRecord[]> {
   const settings = await getSiteSettings();
   const listings = await db.listing.findMany({ orderBy: { model: "asc" } });
   return listings.map((listing) =>
@@ -783,7 +786,7 @@ export async function getAllListings() {
   );
 }
 
-export async function getListingBySlug(slug: string) {
+export async function getListingBySlug(slug: string): Promise<LocalListingRecord | null> {
   const settings = await getSiteSettings();
   const listing = await db.listing.findUnique({ where: { slug } });
   return listing
@@ -791,7 +794,9 @@ export async function getListingBySlug(slug: string) {
     : null;
 }
 
-export async function ensureTransactionForAcceptedOffer(offerId: string) {
+export async function ensureTransactionForAcceptedOffer(
+  offerId: string,
+): Promise<LocalTransactionRecord | null> {
   const existing = await getTransactionsWhere('WHERE "offerId" = $1', [offerId]);
   if (existing[0]) {
     return existing[0];
@@ -862,25 +867,29 @@ export async function ensureTransactionForAcceptedOffer(offerId: string) {
   return created[0] ?? null;
 }
 
-export async function getTransactionsByUserId(userId: string) {
+export async function getTransactionsByUserId(userId: string): Promise<LocalTransactionRecord[]> {
   return getTransactionsWhere('WHERE "userId" = $1 ORDER BY "createdAt" DESC', [userId]);
 }
 
-export async function getAllTransactions() {
+export async function getAllTransactions(): Promise<LocalTransactionRecord[]> {
   return getTransactionsWhere('ORDER BY "createdAt" DESC');
 }
 
-export async function getTransactionById(id: string) {
+export async function getTransactionById(id: string): Promise<LocalTransactionRecord | null> {
   const transactions = await getTransactionsWhere("WHERE id = $1", [id]);
   return transactions[0] ?? null;
 }
 
-export async function getInvoiceByTransactionId(transactionId: string) {
+export async function getInvoiceByTransactionId(
+  transactionId: string,
+): Promise<LocalInvoiceRecord | null> {
   const invoice = await db.invoice.findUnique({ where: { transactionId } });
   return invoice ? mapInvoice(invoice) : null;
 }
 
-export async function getDocumentsByTransactionId(transactionId: string) {
+export async function getDocumentsByTransactionId(
+  transactionId: string,
+): Promise<LocalDocumentRecord[]> {
   const documents = await db.document.findMany({
     where: { transactionId },
     orderBy: { name: "asc" },
@@ -1177,7 +1186,7 @@ export async function updateDocumentStatus(
   });
 }
 
-export async function getListingsBySellerId(sellerId: string) {
+export async function getListingsBySellerId(sellerId: string): Promise<LocalListingRecord[]> {
   const settings = await getSiteSettings();
   const listings = await db.listing.findMany({
     where: { sellerId },
@@ -1194,7 +1203,7 @@ export async function createListingUpdateRequest(input: {
   requestedDescription: string;
   requestedCurrentListPrice: string;
   requestedReservePrice: string;
-}) {
+}): Promise<LocalListingUpdateRequestRecord> {
   const request = await db.listingUpdateRequest.create({
     data: {
       id: `lur-${crypto.randomUUID()}`,
@@ -1224,7 +1233,7 @@ export async function createListingUpdateRequest(input: {
   return mapListingUpdateRequest(request);
 }
 
-export async function getListingUpdateRequests() {
+export async function getListingUpdateRequests(): Promise<LocalListingUpdateRequestRecord[]> {
   const requests = await db.listingUpdateRequest.findMany({
     orderBy: { createdAt: "desc" },
   });
@@ -1268,7 +1277,9 @@ export async function updateListingUpdateRequestStatus(
   });
 }
 
-export async function getTransactionsBySellerId(sellerId: string) {
+export async function getTransactionsBySellerId(
+  sellerId: string,
+): Promise<LocalTransactionRecord[]> {
   const transactions = await db.transaction.findMany({
     where: { listing: { sellerId } },
     orderBy: { createdAt: "desc" },
@@ -1276,7 +1287,7 @@ export async function getTransactionsBySellerId(sellerId: string) {
   return transactions.map(mapTransaction);
 }
 
-export async function getOffersBySellerId(sellerId: string) {
+export async function getOffersBySellerId(sellerId: string): Promise<LocalOfferRecord[]> {
   const offers = await db.offer.findMany({
     where: { listing: { sellerId } },
     orderBy: { createdAt: "desc" },
@@ -1284,7 +1295,7 @@ export async function getOffersBySellerId(sellerId: string) {
   return offers.map(mapOffer);
 }
 
-export async function getAllUsers() {
+export async function getAllUsers(): Promise<LocalUserRecord[]> {
   const users = await db.user.findMany({
     orderBy: [{ role: "asc" }, { name: "asc" }],
   });
@@ -1310,7 +1321,9 @@ export async function updateUserVerificationStatus(
   });
 }
 
-export async function getActivityByTransactionId(transactionId: string) {
+export async function getActivityByTransactionId(
+  transactionId: string,
+): Promise<LocalActivityRecord[]> {
   const activity = await db.activityLog.findMany({
     where: { transactionId },
     orderBy: { createdAt: "desc" },
@@ -1318,7 +1331,7 @@ export async function getActivityByTransactionId(transactionId: string) {
   return activity.map(mapActivity);
 }
 
-export async function getActivityByUserId(userId: string) {
+export async function getActivityByUserId(userId: string): Promise<LocalActivityRecord[]> {
   const activity = await db.activityLog.findMany({
     where: { userId },
     orderBy: { createdAt: "desc" },
@@ -1326,14 +1339,16 @@ export async function getActivityByUserId(userId: string) {
   return activity.map(mapActivity);
 }
 
-export async function getRecentActivity() {
+export async function getRecentActivity(): Promise<LocalActivityRecord[]> {
   const activity = await db.activityLog.findMany({
     orderBy: { createdAt: "desc" },
   });
   return activity.map(mapActivity);
 }
 
-export async function getVerificationDocumentsByUserId(userId: string) {
+export async function getVerificationDocumentsByUserId(
+  userId: string,
+): Promise<LocalVerificationDocumentRecord[]> {
   const documents = await db.verificationDocument.findMany({
     where: { userId },
     orderBy: { createdAt: "desc" },
@@ -1345,7 +1360,7 @@ export async function createVerificationDocument(
   userId: string,
   party: LocalVerificationDocumentRecord["party"],
   name: string,
-) {
+): Promise<LocalVerificationDocumentRecord> {
   const document = await db.verificationDocument.create({
     data: {
       id: `vdoc-${crypto.randomUUID()}`,
@@ -1387,12 +1402,14 @@ export async function updateVerificationDocumentStatus(
   });
 }
 
-export async function getPageContent(slug: LocalPageContentRecord["slug"]) {
+export async function getPageContent(
+  slug: LocalPageContentRecord["slug"],
+): Promise<LocalPageContentRecord | null> {
   const content = await db.pageContent.findUnique({ where: { slug } });
   return content as LocalPageContentRecord | null;
 }
 
-export async function getAllPageContent() {
+export async function getAllPageContent(): Promise<LocalPageContentRecord[]> {
   const content = await db.pageContent.findMany({ orderBy: { slug: "asc" } });
   return content as LocalPageContentRecord[];
 }
@@ -1411,7 +1428,7 @@ export async function createContactRequest(input: {
   name: string;
   email: string;
   message: string;
-}) {
+}): Promise<LocalContactRequestRecord> {
   const request = await db.contactRequest.create({
     data: {
       id: `contact-${crypto.randomUUID()}`,
@@ -1434,7 +1451,7 @@ export async function createContactRequest(input: {
   return mapContactRequest(request);
 }
 
-export async function getAllContactRequests() {
+export async function getAllContactRequests(): Promise<LocalContactRequestRecord[]> {
   const requests = await db.contactRequest.findMany({
     orderBy: { createdAt: "desc" },
   });
@@ -1456,7 +1473,7 @@ export async function createLeadRequest(input: {
   name: string;
   email: string;
   note: string;
-}) {
+}): Promise<LocalLeadRequestRecord> {
   const request = await db.leadRequest.create({
     data: {
       id: `lead-${crypto.randomUUID()}`,
@@ -1480,7 +1497,7 @@ export async function createLeadRequest(input: {
   return mapLeadRequest(request);
 }
 
-export async function getAllLeadRequests() {
+export async function getAllLeadRequests(): Promise<LocalLeadRequestRecord[]> {
   const requests = await db.leadRequest.findMany({
     orderBy: { createdAt: "desc" },
   });
@@ -1497,7 +1514,7 @@ export async function updateLeadRequestStatus(
   });
 }
 
-export async function getAllPartners() {
+export async function getAllPartners(): Promise<LocalPartnerRecord[]> {
   const partners = await db.partner.findMany({
     orderBy: { createdAt: "desc" },
   });
@@ -1514,7 +1531,7 @@ export async function updatePartnerStatus(
   });
 }
 
-export async function getSiteSettings() {
+export async function getSiteSettings(): Promise<LocalSiteSettingRecord | null> {
   const settings = await db.siteSetting.findUnique({ where: { id: "default" } });
   return settings
     ? ({
@@ -1574,7 +1591,9 @@ export async function updateUserRole(id: string, role: LocalUserRecord["role"]) 
   });
 }
 
-export async function getWalletTransactionsByUserId(userId: string) {
+export async function getWalletTransactionsByUserId(
+  userId: string,
+): Promise<LocalWalletTransactionRecord[]> {
   const transactions = await db.walletTransaction.findMany({
     where: { userId },
     orderBy: { createdAt: "desc" },
@@ -1582,7 +1601,7 @@ export async function getWalletTransactionsByUserId(userId: string) {
   return transactions.map(mapWalletTransaction);
 }
 
-export async function getAllWalletTransactions() {
+export async function getAllWalletTransactions(): Promise<LocalWalletTransactionRecord[]> {
   const transactions = await db.walletTransaction.findMany({
     orderBy: { createdAt: "desc" },
   });
