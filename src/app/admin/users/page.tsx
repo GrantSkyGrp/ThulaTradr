@@ -4,13 +4,18 @@ import {
   updateVerificationDocumentStatusAction,
 } from "@/app/actions";
 import { requireAdmin } from "@/lib/auth";
-import { getAllUsers, getVerificationDocumentsByUserId } from "@/lib/local-db";
+import {
+  getAllUsers,
+  getVerificationDocumentsByUserId,
+  type LocalUserRecord,
+  type LocalVerificationDocumentRecord,
+} from "@/lib/local-db";
 
 export default async function AdminUsersPage() {
   await requireAdmin();
   const users = await getAllUsers();
   const bundles = await Promise.all(
-    users.map(async (user) => ({
+    users.map(async (user: LocalUserRecord) => ({
       user,
       documents: await getVerificationDocumentsByUserId(user.id),
     })),
@@ -76,7 +81,7 @@ export default async function AdminUsersPage() {
 
               {documents.length > 0 ? (
                 <div className="admin-user-documents">
-                  {documents.map((document) => (
+                  {documents.map((document: LocalVerificationDocumentRecord) => (
                     <div key={document.id} className="transaction-documents__item">
                       <span>{document.name}</span>
                       <span>{document.party}</span>

@@ -1,7 +1,10 @@
 import Link from "next/link";
 import { submitVerificationDocumentAction } from "@/app/actions";
 import { requireSeller } from "@/lib/auth";
-import { getVerificationDocumentsByUserId } from "@/lib/local-db";
+import {
+  getVerificationDocumentsByUserId,
+  type LocalVerificationDocumentRecord,
+} from "@/lib/local-db";
 
 export default async function SellerProfilePage() {
   const seller = await requireSeller();
@@ -93,7 +96,7 @@ export default async function SellerProfilePage() {
             </form>
 
             <div className="transaction-documents">
-              {documents.map((document) => (
+              {documents.map((document: LocalVerificationDocumentRecord) => (
                 <div key={document.id} className="transaction-documents__item">
                   <span>{document.name}</span>
                   <span>{document.party}</span>
