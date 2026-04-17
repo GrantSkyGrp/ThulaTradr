@@ -6,6 +6,7 @@ import {
   getOffersByUserId,
   getTransactionsByUserId,
   type LocalOfferRecord,
+  type LocalTransactionRecord,
 } from "@/lib/local-db";
 
 export default async function AccountOffersPage() {
@@ -22,7 +23,8 @@ export default async function AccountOffersPage() {
   const offerItems: OfferListItem[] = await Promise.all(
     offers.map(async (offer: LocalOfferRecord) => {
       const listing = await getListingBySlug(offer.listingSlug);
-      const transaction = transactions.find((entry) => entry.offerId === offer.id) ?? null;
+      const transaction =
+        transactions.find((entry: LocalTransactionRecord) => entry.offerId === offer.id) ?? null;
 
       return {
         id: offer.id,
