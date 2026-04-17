@@ -48,7 +48,14 @@ export async function loginAction(formData: FormData) {
   const email = String(formData.get("email") ?? "").trim();
   const password = String(formData.get("password") ?? "");
 
-  const user = await findUserByEmail(email);
+  let user;
+
+  try {
+    user = await findUserByEmail(email);
+  } catch (error) {
+    console.error("Login database lookup failed", error);
+    redirect("/login?error=server");
+  }
 
   if (!user || user.password !== password) {
     redirect("/login?error=invalid");
