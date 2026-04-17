@@ -1,0 +1,312 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum UserRole {
+  user
+  admin
+  seller
+  operator
+}
+
+enum VerificationStatus {
+  pending
+  verified
+  rejected
+}
+
+enum ListingStatus {
+  open
+  under_offer
+}
+
+enum UpdateRequestStatus {
+  none
+  pending
+  approved
+  rejected
+}
+
+enum OfferStatus {
+  submitted
+  accepted
+  rejected
+}
+
+enum TransactionStatus {
+  offer_accepted
+  documents_pending
+  in_transfer
+  awaiting_invoice_details
+  invoice_issued
+  payment_submitted
+  payment_verified
+  seller_paid
+  agreement_sent
+  completed
+}
+
+enum SubmissionStatus {
+  pending
+  submitted
+  uploaded
+  signed
+  received
+}
+
+enum InvoiceStatus {
+  pending_details
+  issued
+  paid_proof_pending
+  paid
+  payment_submitted
+  payment_verified
+}
+
+enum DocumentParty {
+  buyer
+  admin
+  user
+  seller
+}
+
+enum ActorRole {
+  system
+  user
+  seller
+  admin
+  operator
+}
+
+enum RequestStatus {
+  new
+  reviewed
+}
+
+enum LeadType {
+  demo
+  bespoke
+  newsletter
+}
+
+enum PartnerStatus {
+  active
+  draft
+}
+
+enum WalletTransactionType {
+  refund
+  top_up
+}
+
+enum WalletTransactionStatus {
+  pending
+  verified
+  rejected
+}
+
+model User {
+  id                 String                 @id
+  name               String
+  email              String                 @unique
+  password           String
+  role               UserRole
+  verificationStatus VerificationStatus     @default(pending)
+  referenceNumber    String                 @default("")
+  phone              String                 @default("")
+  offers             Offer[]
+  verificationDocs   VerificationDocument[]
+  walletTransactions WalletTransaction[]
+  activity           ActivityLog[]
+  sellerListings     Listing[]              @relation("SellerListings")
+  sellerRequests     ListingUpdateRequest[] @relation("SellerUpdateRequests")
+}
+
+model Listing {
+  slug                String               @id
+  sellerId            String
+  sellerName          String
+  model               String
+  code                String
+  reservePrice        String
+  currentListPrice    String
+  serialLabel         String
+  status              ListingStatus
+  verified            Boolean
+  description         String
+  payableNowBase      Float
+  serviceFeeRate      Float
+  imageUrls           Json
+  updateRequestStatus UpdateRequestStatus  @default(none)
+  seller              User                 @relation("SellerListings", fields: [sellerId], references: [id])
+  offers              Offer[]
+  transactions        Transaction[]
+  updateRequests      ListingUpdateRequest[]
+}
+
+model Offer {
+  id                 String      @id
+  listingSlug        String
+  listingModel       String
+  userId             String
+  userName           String
+  userEmail          String
+  amount             Float
+  currentListPrice   String
+  payableNow         String
+  status             OfferStatus
+  buyerTermsAccepted Boolean     @default(false)
+  createdAt          DateTime    @default(now())
+  listing            Listing     @relation(fields: [listingSlug], references: [slug])
+  user               User        @relation(fields: [userId], references: [id])
+  transaction        Transaction?
+  activity           ActivityLog[]
+}
+
+model Transaction {
+  id                   String            @id
+  offerId              String            @unique
+  listingSlug          String
+  listingModel         String
+  userId               String
+  userName             String
+  userEmail            String
+  status               TransactionStatus
+  invoiceDetailsStatus SubmissionStatus  @default(pending)
+  billingFullName      String            @default("")
+  billingCompanyName   String            @default("")
+  billingVatNumber     String            @default("")
+  billingAddress       String            @default("")
+  billingCellNumber    String            @default("")
+  billingEmail         String            @default("")
+  paymentProofStatus   SubmissionStatus  @default(pending)
+  paymentProofName     String            @default("")
+  buyerTransferStatus  SubmissionStatus  @default(pending)
+  buyerTransferName    String            @default("")
+  sellerSignatureStatus SubmissionStatus @default(pending)
+  sellerSignatureName  String            @default("")
+  sellerPayoutStatus   SubmissionStatus  @default(pending)
+  sellerPayoutReference String           @default("")
+  agreementStatus      SubmissionStatus  @default(pending)
+  agreementName        String            @default("")
+  ownershipTransferredAt DateTime?
+  createdAt            DateTime          @default(now())
+  offer                Offer             @relation(fields: [offerId], references: [id])
+  listing              Listing           @relation(fields: [listingSlug], references: [slug])
+  invoice              Invoice?
+  documents            Document[]
+  activity             ActivityLog[]
+}
+
+model Invoice {
+  id            String        @id
+  transactionId String        @unique
+  invoiceNumber String
+  amount        String
+  status        InvoiceStatus
+  createdAt     DateTime      @default(now())
+  transaction   Transaction   @relation(fields: [transactionId], references: [id])
+}
+
+model Document {
+  id            String         @id
+  transactionId String
+  name          String
+  party         DocumentParty
+  status        SubmissionStatus
+  transaction   Transaction    @relation(fields: [transactionId], references: [id])
+}
+
+model ActivityLog {
+  id            String       @id
+  transactionId String?
+  offerId       String?
+  userId        String?
+  actorRole     ActorRole
+  eventType     String
+  message       String
+  createdAt     DateTime     @default(now())
+  transaction   Transaction? @relation(fields: [transactionId], references: [id])
+  offer         Offer?       @relation(fields: [offerId], references: [id])
+  user          User?        @relation(fields: [userId], references: [id])
+}
+
+model VerificationDocument {
+  id        String            @id
+  userId    String
+  name      String
+  party     DocumentParty
+  status    SubmissionStatus
+  createdAt DateTime          @default(now())
+  user      User              @relation(fields: [userId], references: [id])
+}
+
+model ListingUpdateRequest {
+  id                    String              @id
+  listingSlug           String
+  sellerId              String
+  requestedDescription  String
+  requestedCurrentListPrice String
+  requestedReservePrice String
+  status                UpdateRequestStatus
+  createdAt             DateTime            @default(now())
+  listing               Listing             @relation(fields: [listingSlug], references: [slug])
+  seller                User                @relation("SellerUpdateRequests", fields: [sellerId], references: [id])
+}
+
+model PageContent {
+  slug        String @id
+  title       String
+  description String
+  eyebrow     String
+}
+
+model ContactRequest {
+  id        String        @id
+  name      String
+  email     String
+  message   String
+  status    RequestStatus
+  createdAt DateTime      @default(now())
+}
+
+model LeadRequest {
+  id        String        @id
+  type      LeadType
+  name      String
+  email     String
+  note      String
+  status    RequestStatus
+  createdAt DateTime      @default(now())
+}
+
+model Partner {
+  id        String        @id
+  name      String
+  category  String
+  status    PartnerStatus
+  createdAt DateTime      @default(now())
+}
+
+model SiteSetting {
+  id              String @id
+  supportEmail    String
+  supportPhone    String
+  globalListPrice String @default("R 1 640 000")
+  testEmailStatus String
+}
+
+model WalletTransaction {
+  id        String                  @id
+  userId    String
+  type      WalletTransactionType
+  amount    String
+  status    WalletTransactionStatus
+  proofName String
+  createdAt DateTime                @default(now())
+  user      User                    @relation(fields: [userId], references: [id])
+}
